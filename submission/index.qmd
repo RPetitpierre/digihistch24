@@ -1,35 +1,41 @@
 ---
-submission_id: 499
-title: Digital History Switzerland 2024 submission title
+submission_id: 454
+title: Revealing the Structure of Land Ownership through the Automatic Vectorisation of Swiss Cadastral Plans
 author:
-  - name: Petra Huber
-    orcid: 0000-0002-0760-5497
-    email: petra.huber@university.ch
+  - name: Rémi Petitpierre
+    orcid: 0000-0001-9138-6727
+    email: remi.petitpierre@epfl.ch
     affiliations:
-      - University 1
-  - name: Michel Meier
-    orcid: 0000-0002-7859-8394
-    email: michel.meier@university.edu
+      - EPFL
+  - name: Isabella di Lenardo
+    orcid: 0000-0002-1747-9164
+    email: isabella.dilenardo@epfl.ch
     affiliations:
-      - University 1
-      - University 2
+      - EPFL
+  - name: Lucas Rappo
+    orcid: 0000-0002-7172-2495
+    email: lucas.rappo@epfl.ch
+    affiliations:
+      - EPFL
 keywords:
   - Keyword 1
   - Keyword 2
   - Keyword 3
-  - Keyword 4 (optional)
-  - Keyword 5 (optional)
-abstract: |
+abstract:
   Short abstract of the submission. This is a placeholder for the abstract of the manuscript. It should be between 150 and 250 words. It must not contain any references or unexplained abbreviations.
 key-points:
   - Key point 1 (1 sentence)
   - Key point 2 (1 sentence)
   - Key point 3 (1 sentence)
-date: 03-17-2024
+date: 07-24-2024
 bibliography: references.bib
 ---
 
 ## Introduction
+
+Cadastral plans are a granular, relatively homogeneous, and abundant source for studying land ownership and spatial relationships in 19th century Western Europe [clergeot_cent_2007;di_lenardo_approche_2021;lelo_analysing_2020]. Moreover, from the 18th century, cadastres are generally geometrical, and therefore well aligned with the paradigms of modern geodata. Due to the substantial number of entries and the quantitative nature of these historical sources, digital methods leveraging geographic information systems (GIS) seem most appropriate to approach these archival corpora. In addition, the Napoleonic period resulted in a remarkable harmonization of cadastral ordinances, survey methods, and conventions of representation throughout Europe, which persisted until the middle of the 19th century [hennet_recueil_1811;soulier_instructions_1827;petitpierre_mapping_2023]. This representational coherence makes cadastral plans an interesting target for automated recognition [follin_detection_2021;goderle_ai-driven_2023;petitpierre_recartographier_2023;ares_oliveira_deep_2019]. This research explores how 19th-century cadastres can be massively read and vectorised by machines, and how the resulting geodata can be used to study the dynamics of persistence in the parcel fabric and land ownership.
+
+## Template
 
 This is a placeholder for the extended abstract of the paper. It should be between 1500 and 2000 words (excluding references).
 
