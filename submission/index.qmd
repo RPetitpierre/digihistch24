@@ -6,17 +6,17 @@ author:
     orcid: 0000-0001-9138-6727
     email: remi.petitpierre@epfl.ch
     affiliations:
-      - EPFL
+      - Time Machine Unit, EPFL
   - name: Isabella di Lenardo
     orcid: 0000-0002-1747-9164
     email: isabella.dilenardo@epfl.ch
     affiliations:
-      - EPFL
+      - Time Machine Unit, EPFL
   - name: Lucas Rappo
     orcid: 0000-0002-7172-2495
     email: lucas.rappo@epfl.ch
     affiliations:
-      - EPFL
+      - Time Machine Unit, EPFL
 keywords:
   - Keyword 1
   - Keyword 2
@@ -37,9 +37,15 @@ Cadastral plans are a granular, relatively homogeneous, and abundant source for 
 
 ## Data collection approach
 
-Our data collection approach is based on supervised semantic segmentation. Sematic segmentation is a pixel classification method, where each pixel in the image, i.e. the digitised cadastral plats, is attributed a single semantic class (see Fig. 1). In the present case, we follow the ontology proposed by [@petitpierre_effective_2023] and annotate the images with four land use classes (built, non-built, water, and road network), plus the contours, which allow us to delineate the geometries [@chen_vectorization_2021]. In total, 78 cadastral plats were manually annotated (42 for Lausanne, 10 for Neuchatel, 8 for Geneva, and 18 from various communes in the states of the First French Empire). Thirty percent of the dataset was preserved for validation (2/3), and testing (1/3). A Mask2Former [@cheng_masked-attention_2022;@noauthor_mmsegmentation_2022] neural model was trained on the remaining labels, using 768x768 image crops, until convergence.
+Our data collection approach is based on supervised semantic segmentation. Sematic segmentation is a pixel classification method, where each pixel in the image, i.e. the digitised cadastral plats, is attributed a single semantic class (see @fig1). In the present case, we follow the ontology proposed by [@petitpierre_effective_2023] and annotate the images with four land use classes (built, non-built, water, and road network), plus the contours, which allow us to delineate the geometries [@chen_vectorization_2021]. In total, 78 cadastral plats were manually annotated (42 for Lausanne, 10 for Neuchatel, 8 for Geneva, and 18 from various communes in the states of the First French Empire). Thirty percent of the dataset was preserved for validation (2/3), and testing (1/3). A Mask2Former [@cheng_masked-attention_2022;@noauthor_mmsegmentation_2022] neural model was trained on the remaining labels, using 768x768 image crops, until convergence.
 
 The trained segmentation model is used to automate the recognition of the remaining cadastral plats for three cadastral series of Lausanne [@melotte_plans_1722;@berney_plan_1831;@deluz_plans_1886], which total 570 plats. In a first step, the sheets were georeferenced and separated from the legend. Second, the semantic segmentation was applied directly on the georeferenced images. Third, the resulting predictions masks were manually reviewed, and the most salient inconsistencies were corrected. Finally, the raster masks were vectorized, as described in [@vaienti_machine-learning-enhanced_2023]. The data collection workload is estimated to 15 workdays the specific annotation of 42 plats, 5 workdays for the initial correction of the predictions, and 2 workdays (excluding research and development) for the automatic segmentation and vectorisation. By contrast, the estimated workload for manually vectorising the whole corpus would be over 260 days.
+
+::: {#fig1}
+
+![Illustration of the raster/pixel annotation of the 1886 cadastre of Lausanne by Louis Deluz, using five semantic classes (red: built, dark grey: non-built, light grey: road network, violet: water, white: contours, black: background).](images/segmentation.pdf)
+
+:::
 
 ## Persistence
 
@@ -47,9 +53,19 @@ We adopt two complementary approaches for studying the structure of land ownersh
 
 Fusion and division are measured separately. The detection of both processes is based on the spatial matching of the parcels in two distinct historical layers. Only child parcels whose overlap with the parent is at least 50% are considered for division, and vice versa for fusion. For fusion, the measure of shape similarity is based on the computation of the absolute difference of turning functions [@arkin_efficiently_1991] between the child parcels and the parent one, and vice versa. This method, which intuitively focuses on a shape's salient angles, excels at comparing shapes which exhibit inequal level of detail or resolution, which is precisely the case for the extracted geometries, originating from diverse series[^1].
 
-This process allows us to establish maps of land persistence and continuity (Fig. 2, 4, and 6), whose results will be presented and discussed in a chronological order. While the changes observed in the first time stratum (1722-1831, Fig. 2) might appear somehow disordered at first sight, it is in fact due to the complexity of the dynamics observed.
+::: {#fig2}
 
-At the beginning of the 18th century, the development of the city was mainly contained within its enclosure, to the exception of the three faubourgs: Halle[^2], Martheray[^2] and Chêne. The demand for space was stimulating the densification of buildings within the enclosure [@rickli_lausanne_1978]. The Rôtillon neighbourhood is a good example of this phenomenon. The vegetable gardens found there, whose yield was probably not very profitable since they were in the shadow of the hill of Bourg, were replaced by small buildings.
+![Dynamics of land plot persistence in Lausanne between 1722 and 1831. The red areas underwent fusion processes, whereas division dynamics are observed in blue areas. Magenta indicates continuity. ](images/persistence_1727_1831_light.pdf)
+
+:::
+::: {#fig3}
+
+![](images/center_melotte_v2.pdf)
+![Expansion of the city outside its historical enclosure between 1722 (top) and 1831 (bottom).](images/center_berney_v2.pdf)
+
+:::
+
+This process allows us to establish maps of land persistence and continuity (Fig. 2, 4, and 6), whose results will be presented and discussed in a chronological order. While the changes observed in the first time stratum (1722-1831, Fig. 2) might appear somehow disordered at first sight, it is in fact due to the complexity of the dynamics observed. At the beginning of the 18th century, the development of the city was mainly contained within its enclosure, to the exception of the three faubourgs: Halle[^2], Martheray[^2] and Chêne. The demand for space was stimulating the densification of buildings within the enclosure [@rickli_lausanne_1978]. The Rôtillon neighbourhood is a good example of this phenomenon. The vegetable gardens found there, whose yield was probably not very profitable since they were in the shadow of the hill of Bourg, were replaced by small buildings.
 
 Facing continued demand for space, the city's medieval fortifications were progressively dismantled. The new buildings and the reorganization of land parcels at that time (Fig. 2) met four distinct demands. The first two impacted development in the immediate vicinity of the city (Fig. 3). First, infrastructures, such as the chapel and the charity school of Valentin, the casino to the south, and the "maison de force" (prison) to the east. Second, the expansion of productive areas, concentrating mainly along the Flon, downstream (sawmills, mills) and upstream (mills, tanneries) of the town. The two remaining demands impacted not only the close suburbs, but the whole commune. The first was the multiplication of dispersed rural housing, with the construction of several small agricultural estates scattered across the territory. We can also observe the emergence of periurban land estates, such as the most spectacular mansion in Mon Repos, owned by Alexandre Perdonnet (Fig. 3), but also the new estate of Bellerive (Fig. 2), reconstructed around 1787 by the Francillon family, for example [@grandjean_lausanne_1982]. Farms and estates had contrasting effects on the redrawing of parcels, fueling both fusions and divisions. It is noteworthy, however, that their impact is above all localized and dispersed; hence the strong alternation between both dynamics observed in Fig. 2. Finally, let us also highlight that many plots to the south-east and south-west of the town show remarkable persistence. These are mainly vineyards, which stability also suggests continuity in the economic and cultural value of these lands.
 
