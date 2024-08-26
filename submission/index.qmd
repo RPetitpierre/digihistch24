@@ -99,20 +99,24 @@ Digitization also makes it possible to create links between sources, such as cad
 
 ## Code
 
+```{python}
+#| code-fold: true
+
 ### Imports
-```
+
 import shapefile, tqdm, cv2, json
 import numpy as np
 import pandas as pd
 
 from shapely.geometry import Polygon, MultiPolygon, Point
+from shapely.geometry.base import BaseGeometry
+from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 
 import geopandas as gpd
 
 import rtree
 from rtree import index
-
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.model_selection import train_test_split
@@ -121,11 +125,15 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 %matplotlib inline
+
+import turning_function # pip install turning_function
 ```
 
 ### Functions
-```
-def createIndex(gdf: gpd.GeoDataFrame):
+
+```{python}
+#| code-fold: true
+def create_index(gdf: gpd.GeoDataFrame):
     '''Creates an Index to accelerate data processing'''
     
     idx = index.Index()
@@ -157,7 +165,7 @@ def createIndex(gdf: gpd.GeoDataFrame):
     
     return idx, gdf
 
-def matchParcels(gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame, index_1: rtree.Index, index_2: rtree.Index):
+def match_parcels(gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame, index_1: rtree.Index, index_2: rtree.Index):
     '''Check which geometries are matching together and computes the relative overlap'''
     
     matches = dict()
@@ -170,11 +178,11 @@ def matchParcels(gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame, index_1: rtre
         # Find potential matches based on bounding box overlap
         potential_indices = list(index_2.intersection(poly1.bounds))
         
-        if potential_indices:
+        if len(potential_indices) > 0:
             
             # Focus on actual matches
             potential_matches = gdf_2.geometry.iloc[potential_indices]
-            overlaps = potential_matches.overlaps(poly1)
+            overlaps = potential_matches.intersects(poly1)
             actual_matches = np.array(potential_indices)[overlaps.values]
             
             # Computes the overlap
@@ -182,12 +190,12 @@ def matchParcels(gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame, index_1: rtre
             overlap_ratio = actual_overlaps.intersection(poly1).area / poly1.area
             overlapping_matches = actual_matches[overlap_ratio > 0.5]
 
-            if any(overlapping_matches):
+            if len(overlapping_matches) > 0:
                 matches[i] = overlapping_matches.tolist()
                 
     return matches
 
-def reverseMatches(matches: dict):
+def reverse_matches(matches: dict):
     '''Get reciprocal matching relations'''
     
     rev_matches = dict()
@@ -221,60 +229,35 @@ def overlap_percentage(old_poly: Polygon, new_poly: Polygon):
     except:
         return 0
     
-def calculate_angles(polygon: Polygon):
-    '''Calculate the angles of a polygon'''
+def compare_polygons(poly_1: Polygon, poly_2: Polygon):
+    ''' Return the Turning function score of two polygons'''
     
-    # Convert the polygon to a numpy array
-    points = np.array(polygon.exterior.coords)
+    def compute_signed_area(polygon):
+        coords = list(polygon.exterior.coords)
+        n = len(coords)
+        signed_area = 0.0
+        for i in range(n - 1):
+            x0, y0 = coords[i]
+            x1, y1 = coords[i + 1]
+            signed_area += (x0 * y1 - x1 * y0)
+        signed_area /= 2.0
+        
+        return signed_area
 
-    # Calculate the vectors between points
-    vectors = np.diff(points, axis=0)
-
-    # Calculate the angles between vectors
-    angles = np.arctan2(vectors[:,1], vectors[:,0])
-
-    # Accumulate the angles to get the turning function
-    turning_function = np.cumsum(np.diff(angles))
-
-    # Normalize the turning function
-    turning_function = turning_function / (2 * np.pi)
-
-    return turning_function
-
-
-def compare_polygons(polygon1: Polygon, polygon2: Polygon):
-    '''Compare two polygons using their turning functions'''
+    def normalize_polygon(polygon):
+        
+        if compute_signed_area(polygon) < 0:        
+            return orient(polygon, 1).normalize()
+        else:
+            return polygon.normalize()
     
-    min_area = np.inf
-
-    # Calculate the turning functions of each polygon for every possible starting point
-    for i in range(len(polygon1.exterior.coords)-1):
-        for j in range(len(polygon2.exterior.coords)-1):
-            
-            # Rotate the coordinates to start at a different point
-            coords1 = np.roll(polygon1.exterior.coords, -i, axis=0)
-            coords2 = np.roll(polygon2.exterior.coords, -j, axis=0)
-
-            # Create new polygons with the rotated coordinates
-            rotated_polygon1 = Polygon(coords1)
-            rotated_polygon2 = Polygon(coords2)
-
-            # Calculate the turning functions
-            tf1 = calculate_angles(rotated_polygon1)
-            tf2 = calculate_angles(rotated_polygon2)
-
-            # Interpolate the turning functions to a common set of points
-            x = np.linspace(0, 1, 1000)
-            tf1_interp = np.interp(x, np.linspace(0, 1, len(tf1)), tf1)
-            tf2_interp = np.interp(x, np.linspace(0, 1, len(tf2)), tf2)
-
-            # Calculate the area between the turning functions
-            area = np.sum(np.abs(tf1_interp - tf2_interp)) / len(x)
-
-            # Update minimum area
-            min_area = min(min_area, area)
-
-    return min_area
+    def list_points(polygon):
+        x, y = normalize_polygon(polygon).exterior.coords.xy
+        return [(x_, y_) for x_, y_ in zip(x, y)]
+    
+    dist, _, _, _ = turning_function.distance(list_points(poly_1), list_points(poly_2))
+    
+    return dist
 
 def create_image(polygons: Polygon, bounds: tuple, grid_size: int = 2, max_score: float = 1.):
     '''Create an image from a list of polygons with associated Turning function scores.'''
@@ -304,7 +287,7 @@ def create_image(polygons: Polygon, bounds: tuple, grid_size: int = 2, max_score
                     
                     # Convert the Turning function score to a pixel intensity
                     score = min(max_score, poly['turning_score'])
-                    intensity = int((1 - score) * 255)
+                    intensity = int((1-score) * 255)
 
                     # Set the pixel's intensity
                     img.putpixel((x, y), intensity)
@@ -312,7 +295,7 @@ def create_image(polygons: Polygon, bounds: tuple, grid_size: int = 2, max_score
 
     return img
 
-def computeDynamics(rev_matches: dict, gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame):
+def compute_dynamics(rev_matches: dict, gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame):
     '''Compute fusion dynamics between gdf_1 and gdf_2'''
     
     dynamic = list()
@@ -330,14 +313,14 @@ def computeDynamics(rev_matches: dict, gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDa
             poly_1 = unary_union(gdf_1['geometry'][rev_matches[key]])
             match_type = 'many-to-one'
             
-        if not(poly_1.type == 'Polygon'):
+        if not(poly_1.geom_type == 'Polygon'):
             poly_1 = convert_multipolygon_to_polygon(poly_1)
-            if not (poly_1.type == 'Polygon'):
+            if not (poly_1.geom_type == 'Polygon'):
                 poly_1 = poly_1.geoms[np.argmax([geom.area for geom in poly_1.geoms])]
                 
-        if not(poly_2.type == 'Polygon'):
+        if not(poly_2.geom_type == 'Polygon'):
             poly_2 = Polygon(convert_multipolygon_to_polygon(poly_2))
-            if not (poly_2.type == 'Polygon'):
+            if not (poly_2.geom_type == 'Polygon'):
                 poly_2 = poly_2.geoms[np.argmax([geom.area for geom in poly_2.geoms])]
             
         dist = compare_polygons(poly_2, poly_1)
@@ -353,23 +336,31 @@ def computeDynamics(rev_matches: dict, gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDa
 
 def convert_multipolygon_to_polygon(multipolygon: MultiPolygon):
     '''Convert multipolygons to polygons by filling the gaps between parts'''
+
+    # Ensure we're working with a MultiPolygon
+    if not isinstance(multipolygon, MultiPolygon):
+        raise TypeError("Input geometry must be a MultiPolygon")
+
+    # Extract the individual polygons
+    polygons = list(multipolygon.geoms)
     
     # Start with the first polygon
-    polygon = multipolygon.geoms[0]
-    
+    polygon = polygons[0]
+
     # Iterate over the remaining polygons in the MultiPolygon
-    for part in multipolygon.geoms[1:]:
+    for part in polygons[1:]:
         if part.area < 0.5:
             continue
+        
         distance = polygon.distance(part)
-        buffered_polygon = polygon.buffer(2*distance)
-        buffered_part = part.buffer(2*distance)
-        
+        buffered_polygon = polygon.buffer(2 * distance)
+        buffered_part = part.buffer(2 * distance)
+
         # Unary union of the buffered shapes
-        polygon = unary_union([buffered_polygon, buffered_part])
-        
+        combined = unary_union([buffered_polygon, buffered_part])
+
         # Apply negative buffer to shrink back
-        polygon = polygon.buffer(-2*distance)
+        polygon = combined.buffer(-2 * distance)
     
     return polygon
 
@@ -405,36 +396,48 @@ def compute_legend():
     
     return legend, colors
 ```
+
 ### Load data
-```
-path = '1722.shp'
+
+```{python}
+#| code-fold: true
+path = 'data/1722_sample.shp'
 gdf_1 = gpd.read_file(path)
 gdf_1 = gdf_1[(gdf_1['class'] == 'built') | (gdf_1['class'] == 'non-built')].reset_index(drop=True)
 
-path = '1831.shp'
+path = 'data/1831_sample.shp'
 gdf_2 = gpd.read_file(path)
 gdf_2 = gdf_2[(gdf_2['class'] == 'built') | (gdf_2['class'] == 'non-built')].reset_index(drop=True)
 ```
 
-### Match geometries
+### Display original_data
+```{python}
+#| code-fold: true
+gdf_1.plot();
+gdf_2.plot();
 ```
-index_1, gdf_1 = createIndex(gdf_1)
-index_2, gdf_2 = createIndex(gdf_2)
 
-matches_1_2 = matchParcels(gdf_1, gdf_2, index_1, index_2)
-matches_2_1 = matchParcels(gdf_2, gdf_1, index_2, index_1)
+### Match geometries
+```{python}
+#| code-fold: true
+index_1, gdf_1 = create_index(gdf_1)
+index_2, gdf_2 = create_index(gdf_2)
 
-rev_matches_1_2 = reverseMatches(matches_1_2)
-rev_matches_2_1 = reverseMatches(matches_2_1)
+matches_1_2 = match_parcels(gdf_1, gdf_2, index_1, index_2)
+matches_2_1 = match_parcels(gdf_2, gdf_1, index_2, index_1)
+
+rev_matches_1_2 = reverse_matches(matches_1_2)
+rev_matches_2_1 = reverse_matches(matches_2_1)
 ```
 
 ### Detection of persistence, fusion, division
-```
-fusion = computeDynamics(rev_matches_1_2, gdf_1, gdf_2)
-division = computeDynamics(rev_matches_2_1, gdf_2, gdf_1)
+```{python}
+#| code-fold: true
+fusion = compute_dynamics(rev_matches_1_2, gdf_1, gdf_2)
+division = compute_dynamics(rev_matches_2_1, gdf_2, gdf_1)
 
-df_pers_fusion = pd.DataFrame(fusion)
-df_pers_division = pd.DataFrame(division)
+df_pers_fusion = gpd.GeoDataFrame(fusion)
+df_pers_division = gpd.GeoDataFrame(division)
 df_pers_fusion['turning_score'] = df_pers_fusion['dist'].rank()/len(df_pers_fusion)
 df_pers_division['turning_score'] = df_pers_division['dist'].rank()/len(df_pers_division)
 fusion_dict = df_pers_fusion.to_dict(orient='records')
@@ -442,30 +445,34 @@ division_dict = df_pers_division.to_dict(orient='records')
 ```
 
 ### Draw and save persistence plot
-```
+```{python}
+#| code-fold: true
 legend, colors = compute_legend()
 cv2.imwrite('persistence_legend_red_blue.png', legend)
 
-bounds = (2534054.043, 1150650.392, 2544978.007, 1161552.53)
-min_x, min_y, max_x, max_y = bounds
+min_x, min_y, _, _ = gdf_1.bounds.min()
+_, _, max_x, max_y = gdf_1.bounds.max()
+bounds = min_x, min_y, max_x, max_y
 
-for item in fusion:
+for item in fusion_dict:
     item['polygon'] = gdf_2.iloc[item['2']]['geometry']
-img_fusion = create_image(fusion, bounds, grid_size=3)
+img_fusion = create_image(fusion_dict, bounds, grid_size=1)
 
-for item in division:
+for item in division_dict:
     item['polygon'] = gdf_1.iloc[item['2']]['geometry']
-img_fusion = create_image(division, bounds, grid_size=3)
+img_division = create_image(division_dict, bounds, grid_size=1)
 
 merge_img = cv2.merge([np.array(img_division), np.zeros(np.array(img_fusion).shape, dtype='uint8'), np.array(img_fusion)])
-cv2.imwrite('persistence_1723_1831.png', merge_img) # Black mode
+cv2.imwrite('persistence_sample_1722_1831.png', merge_img) # Dark mode
 
 light_img = np.zeros(np.array(merge_img).shape, dtype='uint8')
 for i in tqdm.tqdm(range(light_img.shape[0])):
     for j in range(light_img.shape[1]):
         r, g, b = merge_img[i, j]
         light_img[i, j] = legend[r, b]
-cv2.imwrite('persistence_1888_2020_light.png', light_img) # Light mode
+cv2.imwrite('persistence_sample_1722_1831_light.png', light_img) # Light mode
+
+Image.fromarray(light_img)
 ```
 
 
