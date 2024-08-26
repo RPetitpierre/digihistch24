@@ -137,27 +137,30 @@ def create_index(gdf: gpd.GeoDataFrame):
     valid_geometries = list()
     
     for pos, geom in enumerate(gdf.geometry):
-        
+
         # Skip null or empty geometries
         if geom is None:
+            valid_geometries.append(None)
             continue
         if geom.is_empty:
+            valid_geometries.append(None)
             continue
-            
+
         # Validate and possibly fix geometry
         if not geom.is_valid:
             geom = geom.buffer(0)
             if not geom.is_valid or geom.is_empty:
+                valid_geometries.append(None)
                 continue  # Skip still invalid or empty geometries after fixing
-                
+
         valid_geometries.append(geom)
-        
+
         # Ensure the bounds are in the correct format
         if len(geom.bounds) == 4:
             idx.insert(pos, geom.bounds)
         else:
             print(f"Skipped geometry at position {pos} with invalid bounds: {geom.bounds}")
-            
+
     gdf.geometry = gpd.GeoSeries(valid_geometries)
     
     return idx, gdf
@@ -249,7 +252,12 @@ def compare_polygons(poly_1: Polygon, poly_2: Polygon):
             return polygon.normalize()
     
     def list_points(polygon):
-        x, y = normalize_polygon(polygon).exterior.coords.xy
+        norm_poly = normalize_polygon(polygon)
+        x, y = norm_poly.exterior.coords.xy
+        
+        if len(x) > 1024:
+            x, y = norm_poly.simplify(GRID_SIZE/2).exterior.coords.xy
+            
         return [(x_, y_) for x_, y_ in zip(x, y)]
     
     dist, _, _, _ = turning_function.distance(list_points(poly_1), list_points(poly_2))
@@ -359,6 +367,11 @@ def convert_multipolygon_to_polygon(multipolygon: MultiPolygon):
         # Apply negative buffer to shrink back
         polygon = combined.buffer(-2 * distance)
     
+    # In case of failure (e.g. very thin geometry, simply take the largest part)
+    if isinstance(polygon, MultiPolygon):
+        areas = np.array([part.area for part in polygon.geoms])
+        polygon = polygon.geoms[np.argmax(areas)]
+    
     return polygon
 
 def compute_legend():
@@ -405,6 +418,8 @@ gdf_1 = gdf_1[(gdf_1['class'] == 'built') | (gdf_1['class'] == 'non-built')].res
 path = 'data/1831_sample.shp'
 gdf_2 = gpd.read_file(path)
 gdf_2 = gdf_2[(gdf_2['class'] == 'built') | (gdf_2['class'] == 'non-built')].reset_index(drop=True)
+
+GRID_SIZE = 1
 ```
 
 ### Display original_data
@@ -435,6 +450,8 @@ division = compute_dynamics(rev_matches_2_1, gdf_2, gdf_1)
 
 df_pers_fusion = gpd.GeoDataFrame(fusion)
 df_pers_division = gpd.GeoDataFrame(division)
+df_pers_fusion = df_pers_fusion[df_pers_fusion['dist'] < 2.5]
+df_pers_division = df_pers_division[df_pers_division['dist'] < 2.5]
 df_pers_fusion['turning_score'] = df_pers_fusion['dist'].rank()/len(df_pers_fusion)
 df_pers_division['turning_score'] = df_pers_division['dist'].rank()/len(df_pers_division)
 fusion_dict = df_pers_fusion.to_dict(orient='records')
@@ -453,11 +470,11 @@ bounds = min_x, min_y, max_x, max_y
 
 for item in fusion_dict:
     item['polygon'] = gdf_2.iloc[item['2']]['geometry']
-img_fusion = create_image(fusion_dict, bounds, grid_size=1)
+img_fusion = create_image(fusion_dict, bounds, grid_size=GRID_SIZE)
 
 for item in division_dict:
     item['polygon'] = gdf_1.iloc[item['2']]['geometry']
-img_division = create_image(division_dict, bounds, grid_size=1)
+img_division = create_image(division_dict, bounds, grid_size=GRID_SIZE)
 
 merge_img = cv2.merge([np.array(img_division), np.zeros(np.array(img_fusion).shape, dtype='uint8'), np.array(img_fusion)])
 cv2.imwrite('persistence_sample_1722_1831.png', merge_img) # Dark mode
