@@ -62,7 +62,7 @@ Fusion and division are measured separately. The detection of both processes is 
 
 While the changes observed in the first time stratum (1722-1831, @fig-2) might appear somehow disordered at first sight, it is in fact due to the complexity of the dynamics observed. At the beginning of the 18th century, the development of the city was mainly contained within its enclosure, to the exception of the three faubourgs: Halle, Martheray and Chêne[^2]. The demand for space was stimulating the densification of buildings within the enclosure [@rickli_lausanne_1978]. The Rôtillon neighbourhood is a good example of this phenomenon. The vegetable gardens found there, whose yield was probably not very profitable since they were in the shadow of the hill of Bourg, were replaced by small buildings.
 
-Facing continued demand for space, the city's medieval fortifications were progressively dismantled. The new buildings and the reorganization of land parcels at that time (@fig-2) met four distinct demands. The first two impacted development in the immediate vicinity of the city (@fig-3). First, infrastructures, such as the chapel and the charity school of Valentin, the casino to the south, and the "maison de force" (prison) to the east. Second, the expansion of productive areas, concentrating mainly along the Flon, downstream (sawmills, mills) and upstream (mills, tanneries) of the town. The two remaining demands impacted not only the close suburbs, but the whole commune. The first was the multiplication of dispersed rural housing, with the construction of several small agricultural estates scattered across the territory. We can also observe the emergence of periurban land estates, such as the most spectacular mansion in Mon Repos, owned by Alexandre Perdonnet (@fig-3), but also the new estate of Bellerive (@fig-2), reconstructed around 1787 by the Francillon family, for example [@grandjean_lausanne_1982]. Farms and estates had contrasting effects on the redrawing of parcels, fueling both fusions and divisions. It is noteworthy, however, that their impact is above all localized and dispersed; hence the strong alternation between both dynamics observed in @fig-2. Finally, let us also highlight that many plots to the south-east and south-west of the town show remarkable persistence. These are mainly vineyards, which stability also suggests continuity in the economic and cultural value of these lands.
+Facing continued demand for space, the city's medieval fortifications were progressively dismantled. The new buildings and the reorganization of land parcels at that time (@fig-2) met four distinct demands. The first two impacted development in the immediate vicinity of the city (@fig-3). First, infrastructures, such as the chapel and the charity school of Valentin, the casino to the south, and the "maison de force" (prison) to the east. Second, the expansion of productive areas, concentrating mainly along the Flon, downstream (sawmills, mills) and upstream (mills, tanneries) of the town. The two remaining demands impacted not only the close suburbs, but the whole commune. The first was the multiplication of dispersed rural housing, with the construction of several small agricultural estates scattered across the territory. We can also observe the emergence of periurban land estates, such as the most spectacular mansion in Mon Repos, owned by Alexandre Perdonnet (@fig-3), but also the new estate of Bellerive (@fig-2), reconstructed around 1787 by the Francillon family, for example [@grandjean_lausanne_1982]. Farms and estates had contrasting effects on the redrawing of parcels, fueling both fusions, divisions, and even discontinuity through drastic restructuring (e.g. Bellerive). It is noteworthy, however, that their impact is above all localized and dispersed; hence the strong alternation between both dynamics observed in @fig-2. Finally, let us also highlight that many plots to the south-east and south-west of the town show remarkable persistence. These are mainly vineyards, which stability also suggests continuity in the economic and cultural value of these lands.
 
 
 ![Dynamics of land plot persistence in Lausanne between 1831 and 1883.](images/persistence_1831_1888_light.svg){#fig-4}
@@ -80,7 +80,7 @@ This stability contrasts with the dynamics observed in the 19th and 20th centuri
 ![Dynamics of parcel fusions in the city center between 1883 (top) and 2023 (bottom). ](images/center_2020.svg){#fig-7}
 
 
-From 1883 onwards, on the contrary, the layout of the downtown area changed significantly (@fig-6, @fig-7). Following the 1896 publication of the Schnetzler report on health conditions, most of the buildings, deemed dilapidated, and particularly the entire Rôtillon district, were demolished to be replaced by modern housing. The scale of this work can be seen in the impressive dynamics of plot mergers, through which old buildings were being replaced by larger constructions. Urban sprawl, on the other hand, is characterized by a dynamic of morcellation, which no longer impacts only the former vineyards, but in fact all agricultural land, which was sold in allotments to meet the high demand for city. The main exceptions are large infrastructures such as the Milan, Mon Repos, Valency and Bourget public parks, the Montoie cemetery, the Sébeillon train marshalling yard, the Blécherette airport, the CHUV hospital and the Rovéréaz agricultural estate. However, despite the time that separates both cadastres, several plots of land remain, such as the urban houses in Maupas.
+From 1883 onwards, on the contrary, the layout of the downtown area changed significantly (@fig-6, @fig-7). Following the 1896 publication of the Schnetzler report on health conditions, most of the buildings, deemed dilapidated, and particularly the entire Rôtillon district, were demolished to be replaced by modern housing. The scale of this work can be seen in the impressive dynamics of plot mergers, through which old buildings were being replaced by larger constructions. Urban sprawl, on the other hand, is characterized by a dynamic of morcellation, which no longer impacts only the former vineyards, but in fact all agricultural land, which was sold in allotments to meet the high demand for city. The main exceptions are large infrastructures such as the Milan, Mon Repos, Valency and Bourget public parks, the Gare and the Sébeillon train marshalling yard, the Blécherette airport, the CHUV hospital and the Rovéréaz agricultural estate. However, despite the time that separates both cadastres, several plots of land remain, such as the urban houses in Maupas.
 
 ## Social structure of land ownership
 
@@ -104,6 +104,7 @@ Digitization also makes it possible to create links between sources, such as cad
 
 ### Imports
 
+import subprocess, json, sys, time
 import tqdm, cv2
 import numpy as np
 import pandas as pd
@@ -170,7 +171,7 @@ def match_parcels(gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame, index_1: rtr
     
     matches = dict()
 
-    for i, poly1 in enumerate(tqdm.tqdm(gdf_1.geometry)):
+    for i, poly1 in enumerate(tqdm.tqdm(gdf_1.geometry, desc='Matching Parcels')):
 
         if poly1 is None:
             continue
@@ -229,7 +230,7 @@ def overlap_percentage(old_poly: Polygon, new_poly: Polygon):
     except:
         return 0
     
-def compare_polygons(poly_1: Polygon, poly_2: Polygon):
+def compare_polygons(poly_1: Polygon, poly_2: Polygon, fast_mode: bool=True):
     ''' Return the Turning function score of two polygons'''
     
     def compute_signed_area(polygon):
@@ -260,9 +261,45 @@ def compare_polygons(poly_1: Polygon, poly_2: Polygon):
             
         return [(x_, y_) for x_, y_ in zip(x, y)]
     
-    dist, _, _, _ = turning_function.distance(list_points(poly_1), list_points(poly_2))
+    if fast_mode: # Can cause bugs on certain datasets
+        dist, _, _, _ = turning_function.distance(list_points(poly_1), list_points(poly_2))
+    else:
+        dist = run_turning_function_subprocess(list_points(poly_1), list_points(poly_2))
     
     return dist
+
+def run_turning_function_subprocess(arg1, arg2, timeout=1):
+    try:
+        # Prepare the command to run the function in a separate Python process
+        process = subprocess.Popen(
+            [sys.executable, '-c', f'''
+import json
+import turning_function
+dist, _, _, _ = turning_function.distance({arg1}, {arg2})
+print(json.dumps(dist))
+'''], 
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        try:
+            # Wait for the function to complete or timeout
+            stdout, stderr = process.communicate(timeout=timeout)
+
+            if stderr:
+                print(f"Error: {stderr.decode()}")
+                return None
+
+            result = json.loads(stdout.decode())
+            return result
+        except subprocess.TimeoutExpired:
+            print("Function compare_polygons took too long, killing subprocess...")
+            process.kill()
+            return None
+
+    except Exception as e:
+        print(f"An error occurred while running subprocess: {e}")
+        return None
 
 def create_image(polygons: Polygon, bounds: tuple, grid_size: int = 2, max_score: float = 1.):
     '''Create an image from a list of polygons with associated Turning function scores.'''
@@ -280,7 +317,7 @@ def create_image(polygons: Polygon, bounds: tuple, grid_size: int = 2, max_score
         idx.insert(i, poly['polygon'].bounds)
 
     # Go through each pixel in the image
-    for x in tqdm.tqdm(range(width)):
+    for x in tqdm.tqdm(range(width), desc='Drawing results'):
         for y in range(height):
             # Create a point at the current pixel
             point = Point((x * grid_size) + min_x, (height - 1 - y) * grid_size + min_y)
@@ -302,11 +339,12 @@ def create_image(polygons: Polygon, bounds: tuple, grid_size: int = 2, max_score
 
 def compute_dynamics(rev_matches: dict, gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoDataFrame):
     '''Compute fusion dynamics between gdf_1 and gdf_2'''
-    
+        
     dynamic = list()
     
-    for key in tqdm.tqdm(rev_matches.keys()):
-        poly_2 = gdf_2['geometry'][key]
+    for i, key in tqdm.tqdm(enumerate(rev_matches.keys()), desc='Computing Fusion/Division Dynamics'):
+            
+        poly_2 = gdf_2['geometry'].iloc[int(key)]
 
         if len(rev_matches[key]) == 1:
             # one to one match
@@ -317,18 +355,21 @@ def compute_dynamics(rev_matches: dict, gdf_1: gpd.GeoDataFrame, gdf_2: gpd.GeoD
             # many to one
             poly_1 = unary_union(gdf_1['geometry'][rev_matches[key]])
             match_type = 'many-to-one'
-            
+
         if not(poly_1.geom_type == 'Polygon'):
             poly_1 = convert_multipolygon_to_polygon(poly_1)
             if not (poly_1.geom_type == 'Polygon'):
                 poly_1 = poly_1.geoms[np.argmax([geom.area for geom in poly_1.geoms])]
-                
+
         if not(poly_2.geom_type == 'Polygon'):
             poly_2 = Polygon(convert_multipolygon_to_polygon(poly_2))
             if not (poly_2.geom_type == 'Polygon'):
                 poly_2 = poly_2.geoms[np.argmax([geom.area for geom in poly_2.geoms])]
-            
+
         dist = compare_polygons(poly_2, poly_1)
+        
+        if dist is None:
+            dist = 1.
 
         dynamic.append({
             '1': rev_matches[key],
@@ -422,13 +463,6 @@ gdf_2 = gdf_2[(gdf_2['class'] == 'built') | (gdf_2['class'] == 'non-built')].res
 GRID_SIZE = 1
 ```
 
-### Display original_data
-```{python}
-#| code-fold: true
-gdf_1.plot();
-gdf_2.plot();
-```
-
 ### Match geometries
 ```{python}
 #| code-fold: true
@@ -480,7 +514,7 @@ merge_img = cv2.merge([np.array(img_division), np.zeros(np.array(img_fusion).sha
 cv2.imwrite('persistence_sample_1722_1831.png', merge_img) # Dark mode
 
 light_img = np.zeros(np.array(merge_img).shape, dtype='uint8')
-for i in tqdm.tqdm(range(light_img.shape[0])):
+for i in range(light_img.shape[0]):
     for j in range(light_img.shape[1]):
         r, g, b = merge_img[i, j]
         light_img[i, j] = legend[r, b]
